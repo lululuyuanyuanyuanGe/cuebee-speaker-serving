@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cuebee-speaker-serving"
+version = "0.1.0"
+description = "Multi-tenant real-time speaker diarization serving for CueBee"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "numpy>=1.24,<3",
+]
+
+[project.optional-dependencies]
+onnx = ["onnxruntime>=1.17,<2"]
+
+[project.scripts]
+cuebee-speaker-server = "cuebee_speaker.server:main"
+cuebee-speaker-demo = "cuebee_speaker.demo:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
