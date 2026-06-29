@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import functools
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -107,5 +107,5 @@ class LogMelFbank:
         return np.ascontiguousarray(features, dtype=np.float32)
 
     @property
-    def output_shape(self) -> Tuple[None, int]:
+    def output_shape(self) -> Tuple[Optional[int], int]:
         return (None, self.n_mels)

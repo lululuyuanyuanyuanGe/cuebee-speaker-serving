@@ -53,12 +53,13 @@ class EnergyVAD:
         speech = dbfs >= self.threshold_dbfs
 
         if self.hangover_frames and np.any(speech):
-            kernel = np.ones((self.hangover_frames * 2 + 1,), dtype=np.int16)
-            speech = np.convolve(speech.astype(np.int16), kernel, mode="same") > 0
+            original = speech.copy()
+            for offset in range(1, self.hangover_frames + 1):
+                speech[offset:] |= original[:-offset]
+                speech[:-offset] |= original[offset:]
 
         return VADResult(
             frame_is_speech=speech,
             speech_ratio=float(np.mean(speech)),
             root_mean_square_dbfs=dbfs.astype(np.float32),
         )
-
