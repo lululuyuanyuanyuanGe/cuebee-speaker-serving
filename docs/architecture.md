@@ -19,8 +19,10 @@ text, train the speaker model, or implement CueBee's Large Language Model (LLM) 
 4. The micro-batcher isolates long requests in separate buckets. A bucket leaves when it
    is full, reaches its maximum wait, or approaches the earliest request deadline. A hard
    per-session contribution cap prevents one session from filling a batch.
-5. A stateless backend executes either the real Open Neural Network Exchange (ONNX) model
-   or the development implementation and returns normalized 192-dimensional embeddings.
+5. The micro-batcher sends one length-prefixed binary batch to a stateless C++ worker. Its
+   production engine executes the Open Neural Network Exchange (ONNX) model through ONNX
+   Runtime; its deterministic engine exists only for protocol and failure tests. Both return
+   normalized 192-dimensional embeddings.
 6. Online assignment compares the embedding with profiles in the same tenant and session.
    Low-quality input becomes `spk_unknown` and cannot create or update a profile.
 7. The speaker timeline joins STT word timestamps to speaker windows by maximum overlap and
@@ -73,7 +75,7 @@ batch is drained before termination. Recommended overload order:
 | Duplicate or old client stream | epoch/sequence cursor | reject before frontend mutation |
 | Sequence gap | gateway decision | accept, record missing range, allow retransmit control |
 | Embedding backend error | batch execution exception | fail every request in that batch; no centroid mutation |
-| Worker exit | request timeout/connection close | retry on another worker; reload profiles from store |
+| Worker exit | request timeout/closed pipe | restart once locally; profiles remain in the store |
 | State store unavailable | storage exception | fail closed for new speaker creation; do not invent an ID |
 | Low-quality speech | backend quality gate | emit `spk_unknown`; defer identity learning |
 | Long request | length bucket | prevent head-of-line blocking of short windows |
@@ -86,3 +88,13 @@ batch is drained before termination. Recommended overload order:
 - Add authenticated tenant claims at the edge and bind them to the message tenant.
 - Add real trace replay, speaker-attribution accuracy, burst, and worker-kill experiments.
 
+## Native worker boundary
+
+Python owns packet admission, feature extraction, deadline-aware micro-batching, identity
+assignment, persistence, and Speech-to-Text (STT) alignment. C++ owns the inference hot path:
+bounded binary decoding, batch padding, ONNX Runtime session execution, output validation,
+and length normalization. This keeps model execution stateless and independently replaceable.
+
+The current local adapter launches one subprocess and allows one retry after an unexpected
+exit. A production multi-process supervisor can route batches to several identical workers;
+the wire contract is documented in [native-worker-protocol.md](native-worker-protocol.md).

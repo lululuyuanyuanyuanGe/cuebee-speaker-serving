@@ -14,6 +14,7 @@ dependencies = [
 
 [project.optional-dependencies]
 onnx = ["onnxruntime>=1.17,<2"]
+test-model = ["onnx>=1.16,<2"]
 
 [project.scripts]
 cuebee-speaker-server = "cuebee_speaker.server:main"
@@ -28,4 +29,3 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py39"
-

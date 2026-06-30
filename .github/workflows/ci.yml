@@ -16,5 +16,39 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e .
+      - run: cmake -S . -B build/native -DCUEBEE_ENABLE_ONNX=OFF -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build/native --parallel
+      - run: ctest --test-dir build/native --output-on-failure
       - run: python -m unittest discover -s tests -v
+        env:
+          CUEBEE_NATIVE_WORKER: build/native/cpp/cuebee-speaker-worker
       - run: python -m cuebee_speaker.demo
+
+  native-onnx:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e . onnx
+      - name: Download ONNX Runtime 1.27.0
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/microsoft/onnxruntime/releases/download/v1.27.0/onnxruntime-linux-x64-1.27.0.tgz \
+            --output "$RUNNER_TEMP/onnxruntime.tgz"
+          mkdir -p "$RUNNER_TEMP/onnxruntime"
+          tar -xzf "$RUNNER_TEMP/onnxruntime.tgz" \
+            -C "$RUNNER_TEMP/onnxruntime" --strip-components=1
+      - run: python tools/generate_test_onnx.py build/native-test-model.onnx
+      - run: >-
+          cmake -S . -B build/native-onnx
+          -DCUEBEE_ENABLE_ONNX=ON
+          -DONNXRUNTIME_ROOT="$RUNNER_TEMP/onnxruntime"
+          -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build/native-onnx --parallel
+      - run: ctest --test-dir build/native-onnx --output-on-failure
+      - run: python -m unittest tests.test_native_worker -v
+        env:
+          CUEBEE_NATIVE_WORKER: build/native-onnx/cpp/cuebee-speaker-worker
+          CUEBEE_TEST_ONNX_MODEL: build/native-test-model.onnx

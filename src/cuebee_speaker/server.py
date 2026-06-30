@@ -153,7 +153,14 @@ class SpeakerTCPServer:
 
 
 async def _serve(args: argparse.Namespace) -> None:
-    config = AppConfig(model_path=args.model, state_db_path=args.state_db)
+    config = AppConfig(
+        model_path=args.model,
+        native_worker_path=args.native_worker,
+        native_worker_backend=args.native_backend,
+        native_worker_timeout_seconds=args.worker_timeout,
+        native_worker_intra_op_threads=args.intra_op_threads,
+        state_db_path=args.state_db,
+    )
     runtime = build_runtime(config)
     gateway = SpeakerTCPServer(runtime)
     server = await asyncio.start_server(
@@ -173,6 +180,15 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", default=8765, type=int)
     parser.add_argument("--model", help="path to the ERes2Net ONNX artifact")
+    parser.add_argument("--native-worker", help="path to the C++ embedding worker")
+    parser.add_argument(
+        "--native-backend",
+        choices=("auto", "deterministic", "onnx"),
+        default="auto",
+        help="native engine; auto selects ONNX when --model is present",
+    )
+    parser.add_argument("--worker-timeout", default=5.0, type=float)
+    parser.add_argument("--intra-op-threads", default=0, type=int)
     parser.add_argument("--state-db", default="runtime/speaker-state.sqlite3")
     return parser
 
@@ -187,4 +203,3 @@ def main(argv: Optional[list] = None) -> None:
 
 if __name__ == "__main__":
     main()
-

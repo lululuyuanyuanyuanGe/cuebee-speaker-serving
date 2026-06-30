@@ -12,6 +12,7 @@ from .gateway import EventGateway
 from .inference import (
     CrossSessionMicroBatcher,
     DeterministicEmbeddingBackend,
+    NativeWorkerBackend,
     ONNXEmbeddingBackend,
 )
 from .metrics import MetricRegistry
@@ -32,7 +33,25 @@ class ServiceRuntime:
 
 def build_runtime(config: AppConfig) -> ServiceRuntime:
     metrics = MetricRegistry()
-    if config.model_path:
+    if config.native_worker_path:
+        native_backend = config.native_worker_backend
+        if native_backend == "auto":
+            native_backend = "onnx" if config.model_path else "deterministic"
+        backend = NativeWorkerBackend(
+            worker_path=config.native_worker_path,
+            model_path=config.model_path,
+            backend=native_backend,
+            timeout_seconds=config.native_worker_timeout_seconds,
+            intra_op_threads=config.native_worker_intra_op_threads,
+            max_batch_size=config.batcher.max_batch_size,
+            restart_attempts=config.native_worker_restart_attempts,
+        )
+        backend_name = (
+            "native-cpp-onnxruntime-eres2net"
+            if native_backend == "onnx"
+            else "native-cpp-deterministic-development"
+        )
+    elif config.model_path:
         backend = ONNXEmbeddingBackend(config.model_path)
         backend_name = "onnxruntime-eres2net"
     else:
@@ -57,4 +76,3 @@ def build_runtime(config: AppConfig) -> ServiceRuntime:
         autoscaler=AudioBacklogAutoscaler(config.autoscaler),
         backend_name=backend_name,
     )
-

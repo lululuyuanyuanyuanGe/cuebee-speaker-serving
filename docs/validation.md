@@ -11,6 +11,31 @@ length-bucket separation, cross-session batch fill, low-quality rejection, stabl
 after SQLite restart, word-level alignment, autoscaling hysteresis, server dispatch, and an
 audio-to-attributed-transcript integration path.
 
+## Native C++ worker
+
+The protocol and deterministic engine build without an ONNX Runtime installation:
+
+```bash
+cmake -S . -B build/native -DCUEBEE_ENABLE_ONNX=OFF -DCMAKE_BUILD_TYPE=Release
+cmake --build build/native --parallel
+ctest --test-dir build/native --output-on-failure
+CUEBEE_NATIVE_WORKER=build/native/cpp/cuebee-speaker-worker \
+  PYTHONPATH=src python -m unittest tests.test_native_worker -v
+```
+
+For the real runtime path, extract an official ONNX Runtime release and build with
+`-DCUEBEE_ENABLE_ONNX=ON -DONNXRUNTIME_ROOT=/path/to/onnxruntime`. Generate the synthetic
+shape-compatible smoke model with `python tools/generate_test_onnx.py MODEL.onnx`, then run:
+
+```bash
+CUEBEE_NATIVE_WORKER=build/native-onnx/cpp/cuebee-speaker-worker \
+CUEBEE_TEST_ONNX_MODEL=MODEL.onnx \
+PYTHONPATH=src python -m unittest tests.test_native_worker -v
+```
+
+That smoke model validates native loading, padding, `Session::Run`, output extraction, and
+normalization. It is not ERes2Net and supplies no speaker-accuracy evidence.
+
 ## Functional demo
 
 ```bash
@@ -56,4 +81,3 @@ delay, audio seconds per second, RTF, batch fill, and accuracy on labeled traces
 
 Local SQLite proves process restart on one host. A multi-host drill requires a shared store;
 it must not be claimed from the SQLite-only test.
-

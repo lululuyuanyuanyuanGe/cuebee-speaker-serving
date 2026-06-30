@@ -93,5 +93,19 @@ class AppConfig:
     assignment: AssignmentConfig = field(default_factory=AssignmentConfig)
     autoscaler: AutoscalerConfig = field(default_factory=AutoscalerConfig)
     model_path: Optional[str] = None
+    native_worker_path: Optional[str] = None
+    native_worker_backend: str = "auto"
+    native_worker_timeout_seconds: float = 5.0
+    native_worker_intra_op_threads: int = 0
+    native_worker_restart_attempts: int = 1
     state_db_path: str = "runtime/speaker-state.sqlite3"
 
+    def __post_init__(self) -> None:
+        if self.native_worker_backend not in {"auto", "deterministic", "onnx"}:
+            raise ValueError("native_worker_backend must be auto, deterministic, or onnx")
+        if self.native_worker_timeout_seconds <= 0:
+            raise ValueError("native_worker_timeout_seconds must be positive")
+        if self.native_worker_intra_op_threads < 0:
+            raise ValueError("native_worker_intra_op_threads cannot be negative")
+        if self.native_worker_restart_attempts < 0:
+            raise ValueError("native_worker_restart_attempts cannot be negative")

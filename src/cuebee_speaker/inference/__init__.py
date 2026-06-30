@@ -2,6 +2,7 @@
 
 from .backend import DeterministicEmbeddingBackend, EmbeddingBackend
 from .batcher import BatchObservation, CrossSessionMicroBatcher
+from .native_worker import NativeWorkerBackend
 from .onnx_backend import ONNXEmbeddingBackend
 
 __all__ = [
@@ -9,5 +10,6 @@ __all__ = [
     "CrossSessionMicroBatcher",
     "DeterministicEmbeddingBackend",
     "EmbeddingBackend",
+    "NativeWorkerBackend",
     "ONNXEmbeddingBackend",
 ]

@@ -16,6 +16,7 @@ from cuebee_speaker.domain import FeatureChunk
 from cuebee_speaker.inference import (
     CrossSessionMicroBatcher,
     DeterministicEmbeddingBackend,
+    NativeWorkerBackend,
     ONNXEmbeddingBackend,
 )
 from cuebee_speaker.metrics import MetricRegistry
@@ -31,7 +32,19 @@ def _percentiles(values: list) -> dict:
 
 
 async def run(args: argparse.Namespace) -> dict:
-    if args.model:
+    if args.native_worker:
+        native_backend = args.native_backend
+        if native_backend == "auto":
+            native_backend = "onnx" if args.model else "deterministic"
+        backend = NativeWorkerBackend(
+            args.native_worker,
+            model_path=args.model,
+            backend=native_backend,
+            intra_op_threads=args.intra_op_threads,
+            max_batch_size=args.max_batch_size,
+        )
+        backend_name = f"native-cpp-{native_backend}"
+    elif args.model:
         backend = ONNXEmbeddingBackend(args.model, intra_op_threads=args.intra_op_threads)
         backend_name = "onnxruntime-eres2net"
     else:
@@ -126,6 +139,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--deadline-ms", type=int, default=250)
     parser.add_argument("--per-session-batch-limit", type=int, default=2)
     parser.add_argument("--model", help="optional ERes2Net ONNX model path")
+    parser.add_argument("--native-worker", help="optional C++ worker executable")
+    parser.add_argument(
+        "--native-backend",
+        choices=("auto", "deterministic", "onnx"),
+        default="auto",
+    )
     parser.add_argument("--intra-op-threads", type=int, default=0)
     parser.add_argument("--seed", type=int, default=2026)
     return parser
@@ -140,4 +159,3 @@ def main(argv: Optional[list] = None) -> None:
 
 if __name__ == "__main__":
     main()
-

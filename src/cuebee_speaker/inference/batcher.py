@@ -53,6 +53,7 @@ class CrossSessionMicroBatcher:
         self._condition = asyncio.Condition()
         self._runner: Optional["asyncio.Task[None]"] = None
         self._closing = False
+        self._backend_closed = False
         self._ordinal = 0
 
     async def start(self) -> None:
@@ -95,6 +96,11 @@ class CrossSessionMicroBatcher:
         if self._runner is not None:
             await self._runner
             self._runner = None
+        if not self._backend_closed:
+            close_backend = getattr(self._backend, "close", None)
+            if callable(close_backend):
+                await asyncio.to_thread(close_backend)
+            self._backend_closed = True
 
     async def backlog(self) -> Tuple[int, float]:
         async with self._condition:
@@ -243,4 +249,3 @@ class CrossSessionMicroBatcher:
             for item in batch:
                 if not item.future.done():
                     item.future.set_exception(error)
-
