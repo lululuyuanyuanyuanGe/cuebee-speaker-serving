@@ -63,6 +63,48 @@ See [architecture.md](docs/architecture.md) for invariants and failure behavior,
 [native-worker-protocol.md](docs/native-worker-protocol.md) for the Python-to-C++ wire
 format.
 
+## Native C++ and ONNX data plane
+
+The repository deliberately separates orchestration from model execution. It is not a
+Python-only serving path:
+
+| Layer | Language | Responsibilities |
+|---|---|---|
+| Gateway and control plane | Python | packet admission, audio frontend, batching deadlines, tenant state, online speaker assignment, transcript alignment, metrics, and scaling decisions |
+| Inference data plane | C++17 | bounded binary decoding, variable-length batch padding, ONNX Runtime session execution, finite-output checks, and 192-dimensional length normalization |
+
+```mermaid
+flowchart LR
+    A[Python audio frontend] --> B[Cross-session micro-batcher]
+    B --> C[Persistent Python worker client]
+    C -->|length-prefixed float32 batch| D[C++ worker process]
+    D --> E[ONNX Runtime session]
+    E --> F[ERes2Net embedding model]
+    F -->|quality + normalized 192D embedding| C
+    C --> G[Python online speaker assignment]
+```
+
+The Python client launches the worker once, performs a protocol handshake, correlates every
+response with a monotonically increasing request identifier, applies a response timeout,
+and shuts the process down with an explicit control message. If the pipe closes or the
+worker exits unexpectedly, the client discards the process and makes one restart attempt.
+Speaker identifiers remain stable because centroids and allocation counters live in the
+state store, never inside the inference worker.
+
+Two native engines share the same worker protocol:
+
+- `onnx` is the production engine. It owns an ONNX Runtime `Ort::Session`, accepts
+  `[batch,time,80]` log-Mel features, invokes `Session::Run`, verifies exactly
+  `batch * 192` finite output values, and normalizes every embedding.
+- `deterministic` is a dependency-free engine for protocol, scheduling, container, and
+  worker-recovery tests. It is not an acoustic model and cannot produce accuracy evidence.
+
+The cross-language test suite covers batch serialization, output shape and norm, malformed
+feature rejection, unexpected worker death and restart, and real native ONNX execution with
+a generated shape-compatible smoke model. The smoke model proves the runtime integration;
+it is not ERes2Net and does not validate diarization accuracy. The actual production model
+must be supplied separately and calibrated on representative CueBee audio.
+
 ## Quick start
 
 Python 3.9 or newer is supported.
